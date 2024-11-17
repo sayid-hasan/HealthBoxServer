@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const ImageKit = require("imagekit");
 
 require("dotenv").config();
 
@@ -69,6 +70,19 @@ async function run() {
         .toArray();
 
       res.send(reviews);
+    });
+
+    // imagekit image Upload getsignature
+    app.get("/get-signature", async (req, res) => {
+      var imagekit = new ImageKit({
+        publicKey: process.env.IMAGEKIT_PK,
+        privateKey: process.env.IMAGEKIT_SK,
+        urlEndpoint: "https://ik.imagekit.io/sayidImage34/",
+      });
+      const authenticationParameters =
+        await imagekit.getAuthenticationParameters();
+      console.log(authenticationParameters);
+      res.send(authenticationParameters);
     });
 
     console.log(
