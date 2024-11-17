@@ -1,8 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 
-const jwt = require("jsonwebtoken");
-
 require("dotenv").config();
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -31,6 +29,36 @@ async function run() {
     await client.connect();
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
+    // database collection
+    const categoriesCollection = client
+      .db("HealthBox")
+      .collection("categories");
+    const medicinesCollection = client
+      .db("HealthBox")
+      .collection("allmedicine");
+
+    // apis
+    //top categories
+    app.get("/top-categories", async (req, res) => {
+      // Fetch the top 6 selling food items based on purchaseCount
+      const topCatergories = await categoriesCollection
+        .find()
+        .sort({ medicineCount: -1 }) // Sort by purchaseCount in descending order
+        .limit(6) // Limit to 6 results
+        .toArray();
+
+      res.send(topCatergories);
+    });
+    // get discounted medicine from allmedicine COllection
+    app.get("/discountedMedicine", async (req, res) => {
+      const discountedMedicines = await medicinesCollection
+        .find({ discountPercentage: { $gt: 0 } })
+        .sort({ discountPercentage: -1 })
+
+        .toArray();
+      res.send(discountedMedicines);
+    });
+
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
