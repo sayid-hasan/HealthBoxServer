@@ -36,6 +36,7 @@ async function run() {
     const medicinesCollection = client
       .db("HealthBox")
       .collection("allmedicine");
+    const reviewsCollection = client.db("HealthBox").collection("reviews");
 
     // apis
     //top categories
@@ -57,6 +58,17 @@ async function run() {
 
         .toArray();
       res.send(discountedMedicines);
+    });
+
+    // reviews
+    app.get("/reviews", async (req, res) => {
+      const reviews = await reviewsCollection
+        .find()
+        .sort({ starRating: -1 }) // Sort by starRating in descending order
+        .limit(6) // Limit to top 6 reviews
+        .toArray();
+
+      res.send(reviews);
     });
 
     console.log(
