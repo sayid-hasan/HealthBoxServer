@@ -37,9 +37,13 @@ async function run() {
     const medicinesCollection = client
       .db("HealthBox")
       .collection("allmedicine");
+
     const reviewsCollection = client.db("HealthBox").collection("reviews");
+    const usersCollection = client.db("HealthBox").collection("users");
 
     // apis
+
+    // home page
     //top categories
     app.get("/top-categories", async (req, res) => {
       // Fetch the top 6 selling food items based on purchaseCount
@@ -72,6 +76,19 @@ async function run() {
       res.send(reviews);
     });
 
+    // shop page
+    app.get("/allMedicines", async (req, res) => {
+      const result = await medicinesCollection.find().toArray();
+      res.send(result);
+    });
+    // Get medicine by ID
+    app.get("/medicine/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }; // Ensure you import ObjectId from MongoDB
+      const result = await medicinesCollection.findOne(query);
+      res.send(result);
+    });
+
     // imagekit image Upload getsignature
     app.get("/get-signature", async (req, res) => {
       var imagekit = new ImageKit({
@@ -85,6 +102,20 @@ async function run() {
       res.send(authenticationParameters);
     });
 
+    // post user data
+    app.post("/users", async (req, res) => {
+      const user = req?.body;
+      // Check if the email already exists
+      const existingUser = await usersCollection.findOne({ uid: user?.uid });
+
+      if (existingUser) {
+        return res.send({ message: "Email already exists" });
+      }
+
+      // console.log("inside all users", user);
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
