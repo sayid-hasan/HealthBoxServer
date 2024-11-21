@@ -40,6 +40,7 @@ async function run() {
 
     const reviewsCollection = client.db("HealthBox").collection("reviews");
     const usersCollection = client.db("HealthBox").collection("users");
+    const cartsCollection = client.db("HealthBox").collection("carts");
 
     // apis
 
@@ -89,6 +90,15 @@ async function run() {
       res.send(result);
     });
 
+    // get medicine by category
+    app.get("/medicines/category/:category", async (req, res) => {
+      const { category } = req.params;
+      const result = await medicinesCollection
+        .find({ category: category })
+        .toArray();
+      res.send(result);
+    });
+
     // imagekit image Upload getsignature
     app.get("/get-signature", async (req, res) => {
       var imagekit = new ImageKit({
@@ -115,6 +125,41 @@ async function run() {
       // console.log("inside all users", user);
       const result = await usersCollection.insertOne(user);
       res.send(result);
+    });
+    // post cart data
+    app.post("/cart", async (req, res) => {
+      const { name, companyName, price, quantity, userUid } = req.body;
+
+      if (!name || !companyName || !price || !userUid) {
+        return res.status(400).send({ error: "All fields are required." });
+      }
+
+      // Check if the product already exists in the user's cart
+      const existingCartItem = await cartsCollection.findOne({ name, userUid });
+
+      if (existingCartItem) {
+        return res
+          .status(409)
+          .send({ message: "Product already exists in the cart." }); // 409 Conflict
+      }
+
+      const newCartItem = {
+        name,
+        companyName,
+        price,
+        quantity: quantity || 1, // Default quantity is 1
+        userUid,
+      };
+
+      const result = await cartsCollection.insertOne(newCartItem);
+
+      if (result.acknowledged) {
+        res
+          .status(201)
+          .send({ message: "Product added to the cart successfully." });
+      } else {
+        res.status(500).send({ error: "Failed to add product to the cart." });
+      }
     });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
