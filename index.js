@@ -128,9 +128,10 @@ async function run() {
     });
     // post cart data
     app.post("/cart", async (req, res) => {
-      const { name, companyName, price, quantity, userUid } = req.body;
+      const { name, companyName, price, quantity, userUid, image, stock } =
+        req.body;
 
-      if (!name || !companyName || !price || !userUid) {
+      if (!name || !companyName || !price || !userUid || !image || !stock) {
         return res.status(400).send({ error: "All fields are required." });
       }
 
@@ -149,6 +150,8 @@ async function run() {
         price,
         quantity: quantity || 1, // Default quantity is 1
         userUid,
+        image,
+        stock,
       };
 
       const result = await cartsCollection.insertOne(newCartItem);
@@ -161,6 +164,20 @@ async function run() {
         res.status(500).send({ error: "Failed to add product to the cart." });
       }
     });
+    // get users cart items
+    app.get("/cart/:userUid", async (req, res) => {
+      const userUid = req.params.userUid; // Get `userUid` from route params
+
+      // Ensure `userUid` is provided
+      if (!userUid) {
+        return res.status(400).send({ error: "please login" });
+      }
+
+      // Filter cart items based on `userUid`
+      const result = await cartsCollection.find({ userUid }).toArray();
+      res.send(result);
+    });
+
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
