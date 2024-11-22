@@ -198,6 +198,26 @@ async function run() {
         res.status(500).send({ message: "Server error." });
       }
     });
+    // delete cart items
+    app.delete("/cart/:id", async (req, res) => {
+      const { id } = req.params;
+      try {
+        const result = await cartsCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        if (result.deletedCount > 0) {
+          res
+            .status(200)
+            .send({ success: true, message: "Item deleted successfully" });
+        } else {
+          res.status(404).send({ success: false, message: "Item not found" });
+        }
+      } catch (error) {
+        res
+          .status(500)
+          .send({ success: false, message: "Failed to delete item", error });
+      }
+    });
 
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
