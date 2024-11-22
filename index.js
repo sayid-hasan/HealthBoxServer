@@ -177,6 +177,27 @@ async function run() {
       const result = await cartsCollection.find({ userUid }).toArray();
       res.send(result);
     });
+    //update cart items quantity
+    app.patch("/cart/:id", async (req, res) => {
+      const { id } = req.params;
+      const { quantity } = req.body;
+
+      try {
+        const result = await cartsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { quantity: quantity } }
+        );
+
+        if (result.modifiedCount > 0) {
+          res.status(200).send({ message: "Quantity updated successfully." });
+        } else {
+          res.status(400).send({ message: "Failed to update quantity." });
+        }
+      } catch (error) {
+        console.error("Error updating quantity:", error);
+        res.status(500).send({ message: "Server error." });
+      }
+    });
 
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
