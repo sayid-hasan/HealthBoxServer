@@ -6,6 +6,9 @@ require("dotenv").config();
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
+// This is your test secret API key.
+const stripe = require("stripe")(process.env.STRIPE_SK);
+// console.log("stripe secret", process.env.STRIPE_SK);
 const port = process.env.PORT || 5000;
 
 // middleware
@@ -41,6 +44,7 @@ async function run() {
     const reviewsCollection = client.db("HealthBox").collection("reviews");
     const usersCollection = client.db("HealthBox").collection("users");
     const cartsCollection = client.db("HealthBox").collection("carts");
+    const paymentsCollection = client.db("HealthBox").collection("payments");
 
     // apis
 
@@ -218,7 +222,33 @@ async function run() {
           .send({ success: false, message: "Failed to delete item", error });
       }
     });
+    // paymentIntent for stripe
+    app.post("/create-payment-intent", async (req, res) => {
+      const { amount } = req.body;
+      console.log(amount);
 
+      // Create a PaymentIntent with the order amount and currency
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "aed",
+        // In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+        automatic_payment_methods: { enabled: true },
+      });
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+        paymentIntent,
+      });
+    });
+    // save payment history
+    // save payment history
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      console.log("saving payments details", payment);
+      const paymentResult = await paymentsCollection.insertOne(payment);
+
+      res.send(paymentResult);
+    });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
