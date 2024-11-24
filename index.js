@@ -373,6 +373,99 @@ async function run() {
     });
 
     // admin related apis
+
+    app.get("/admin/overview", verifytoken, async (req, res) => {
+      try {
+        // Fetch all payments with the 'paid' status
+        const paidPayments = await paymentsCollection
+          .find({ status: "paid" })
+          .toArray();
+
+        // Calculate total revenue (sum of all paid payments)
+        const totalRevenue = paidPayments.reduce(
+          (sum, payment) => sum + payment.amount,
+          0
+        );
+
+        // Fetch all payments with 'pending' status
+        const pendingPayments = await paymentsCollection
+          .find({ status: "pending" })
+          .toArray();
+
+        // Calculate total pending amount
+        const pendingTotal = pendingPayments.reduce(
+          (sum, payment) => sum + payment.amount,
+          0
+        );
+        console.log(
+          "admin profile",
+          totalRevenue,
+          pendingTotal,
+          paidPayments.length
+        );
+
+        res.send({
+          totalRevenue,
+          pendingTotal,
+          paidTotal: paidPayments.length, // Total number of paid transactions
+        });
+      } catch (error) {
+        console.error(error);
+        res
+          .status(500)
+          .send({ message: "Failed to fetch admin overview data." });
+      }
+    });
+
+    // manage user role
+    // make admin/moderator role verify admin middlware add korba etate
+    app.put("/users/admin/:id", verifytoken, async (req, res) => {
+      const id = req.params.id;
+      const { userRole } = req?.body;
+      const filter = { uid: id };
+      const options = {
+        upsert: true,
+      };
+      const updatedDoc = {
+        $set: {
+          role: userRole,
+        },
+      };
+
+      const result = await usersCollection.updateOne(
+        filter,
+        updatedDoc,
+        options
+      );
+      res.send(result);
+    });
+    app.delete("/users/:id", verifytoken, async (req, res) => {
+      const id = req.params?.id;
+      // console.log(filterdata);
+
+      let query = {
+        _id: new ObjectId(id),
+      };
+
+      // console.log(query);
+      const result = await usersCollection.deleteOne(query);
+      res.send(result);
+    });
+    app.get("/users", verifytoken, async (req, res) => {
+      const filterdata = req.query?.role;
+      console.log(filterdata);
+
+      let query;
+      if (filterdata) {
+        query = {
+          role: filterdata,
+        };
+      }
+      console.log(query);
+      const result = await usersCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // check if user is admin
 
     // check admin
