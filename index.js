@@ -1,7 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const ImageKit = require("imagekit");
-
+const fs = require("fs");
+var jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -15,6 +16,25 @@ const port = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 // console.log(process.env.DB_USER);
+
+// custom middleware
+// custom midlw=eware verify token
+const verifytoken = (req, res, next) => {
+  console.log("inside verifytoken middleware", req.headers.authorization);
+  if (!req.headers.authorization) {
+    return res.status(401).send({ message: "unauthorised access" });
+  }
+  const token = req.headers.authorization.split(" ")[1];
+  console.log("get token", token);
+  jwt.verify(token, process.env.ACCESS_SECRET_TOKEN, (err, decoded) => {
+    if (err) {
+      return res.status(401).send({ message: "unauthorised access" });
+    }
+    req.decoded = decoded;
+    console.log("from verifytoken decoded", decoded);
+    next();
+  });
+};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.grteoyu.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -46,7 +66,46 @@ async function run() {
     const cartsCollection = client.db("HealthBox").collection("carts");
     const paymentsCollection = client.db("HealthBox").collection("payments");
 
-    // apis
+    //  middleware
+    // verify admin after checking verfytoken
+    const verifyadmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      console.log("verify admin ", email);
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      console.log("inside verifyadmin", isAdmin);
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+    // verify seller after checking verfytoken
+    const verifySellerAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      console.log("verify moderator ", email);
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isSellerAdmin = user?.role === "seller" || user?.role === "admin";
+      console.log("inside verifyModeratorAdmin", isSellerAdmin);
+      if (!isSellerAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
+    // jwt related api
+
+    app.post("/jwt", async (req, res) => {
+      const userinfo = req?.body;
+      console.log("inside jwt", userinfo);
+      const token = await jwt.sign(userinfo, process.env.ACCESS_SECRET_TOKEN, {
+        expiresIn: "4h",
+      });
+      console.log(token);
+
+      res.send({ token });
+    });
 
     // home page
     //top categories
@@ -132,8 +191,16 @@ async function run() {
     });
     // post cart data
     app.post("/cart", async (req, res) => {
-      const { name, companyName, price, quantity, userUid, image, stock } =
-        req.body;
+      const {
+        name,
+        companyName,
+        price,
+        quantity,
+        userUid,
+        image,
+        stock,
+        medicineId,
+      } = req.body;
 
       if (!name || !companyName || !price || !userUid || !image || !stock) {
         return res.status(400).send({ error: "All fields are required." });
@@ -149,6 +216,7 @@ async function run() {
       }
 
       const newCartItem = {
+        medicineId,
         name,
         companyName,
         price,
@@ -261,7 +329,23 @@ async function run() {
 
         purchasedItems: cartItems, // Attach cart items to the payment record
       };
-      // delete all items in cart
+      // Step 3: Reduce stock for each purchased item
+      for (const item of cartItems) {
+        const { medicineId, quantity } = item; // Assuming medicineId and quantity are fields in cartItems
+
+        // Reduce stock in allmedicine collection
+        const updateResult = await medicinesCollection.updateOne(
+          { _id: new ObjectId(medicineId) },
+          { $inc: { stock: -quantity } } // Decrement stock by purchased quantity
+        );
+
+        if (!updateResult.modifiedCount) {
+          return res.status(400).send({
+            message: `Stock update failed for item ID: ${medicineId}`,
+          });
+        }
+      }
+      // step-4 delete all items in cart
       await cartsCollection.deleteMany({ userUid });
       const paymentResult = await paymentsCollection.insertOne(paymentDocument);
 
@@ -270,7 +354,7 @@ async function run() {
     // get data for invoice
     app.get("/payment/:transactionId", async (req, res) => {
       const { transactionId } = req?.params;
-      console.log(transactionId);
+      // console.log(transactionId);
       try {
         // Find payment by transactionId
         const paymentDetail = await paymentsCollection.findOne({
@@ -287,6 +371,68 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch payment detail." });
       }
     });
+
+    // admin related apis
+    // check if user is admin
+
+    // check admin
+    app.get(
+      "/users/admin/:email",
+      verifytoken,
+
+      async (req, res) => {
+        const email = req.params.email;
+        console.log("inside useAdmin route", req.decoded.email);
+        console.log("inside useAdmin params", email);
+
+        if (email !== req.decoded.email) {
+          return res.status(401).send({
+            message: "Unauthorize access",
+          });
+        }
+        const query = {
+          email: email,
+        };
+        console.log(query);
+        const user = await usersCollection.findOne(query);
+        console.log("inside useAdmin route", user);
+        let admin = false;
+        if (user) {
+          admin = user?.role === "admin";
+        }
+        res.send({ admin });
+      }
+    );
+
+    // check seller
+    app.get(
+      "/users/seller/:email",
+      verifytoken,
+
+      async (req, res) => {
+        const email = req.params.email;
+        console.log("inside seller route", req.decoded.email);
+        console.log("inside seller params", email);
+
+        if (email !== req.decoded.email) {
+          return res.status(401).send({
+            message: "Unauthorize access",
+          });
+        }
+        const query = {
+          email: email,
+        };
+        console.log(query);
+        const user = await usersCollection.findOne(query);
+        console.log("inside check moderator route", user);
+        let seller = false;
+        if (user) {
+          seller = user?.role === "seller";
+        }
+        console.log(seller);
+        res.send({ seller });
+      }
+    );
 
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
