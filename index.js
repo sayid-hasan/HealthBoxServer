@@ -267,6 +267,27 @@ async function run() {
 
       res.send(paymentResult);
     });
+    // get data for invoice
+    app.get("/payment/:transactionId", async (req, res) => {
+      const { transactionId } = req?.params;
+      console.log(transactionId);
+      try {
+        // Find payment by transactionId
+        const paymentDetail = await paymentsCollection.findOne({
+          transactionId,
+        });
+
+        if (!paymentDetail) {
+          return res.status(404).send({ message: "Payment not found." });
+        }
+
+        res.send(paymentDetail);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Failed to fetch payment detail." });
+      }
+    });
+
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
