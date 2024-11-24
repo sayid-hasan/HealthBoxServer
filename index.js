@@ -243,9 +243,27 @@ async function run() {
     // save payment history
     // save payment history
     app.post("/payments", async (req, res) => {
-      const payment = req.body;
+      const payment = req?.body;
       console.log("saving payments details", payment);
-      const paymentResult = await paymentsCollection.insertOne(payment);
+      const { userId: userUid } = payment;
+
+      // Step 1: Fetch all cart items for the user
+      const cartItems = await cartsCollection.find({ userUid }).toArray();
+
+      if (!cartItems.length) {
+        return res
+          .status(400)
+          .send({ message: "No items in the cart to purchase." });
+      }
+      // Step 2: Create a payment document with cart items
+      const paymentDocument = {
+        ...payment, // Include payment details (e.g., amount, transaction ID, date)
+
+        purchasedItems: cartItems, // Attach cart items to the payment record
+      };
+      // delete all items in cart
+      await cartsCollection.deleteMany({ userUid });
+      const paymentResult = await paymentsCollection.insertOne(paymentDocument);
 
       res.send(paymentResult);
     });
