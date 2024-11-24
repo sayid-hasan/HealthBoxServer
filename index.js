@@ -468,7 +468,7 @@ async function run() {
 
     // manage categories for admin
     // Fetch all categories
-    app.get("/categories", async (req, res) => {
+    app.get("/categories", verifytoken, verifyadmin, async (req, res) => {
       try {
         const categories = await categoriesCollection.find().toArray();
         res.send(categories);
@@ -480,18 +480,18 @@ async function run() {
 
     // Add a new category
     app.post("/categories", async (req, res) => {
-      const { categoryName, categoryImage } = req.body;
+      const { categoryName, categoryImg } = req.body;
 
-      if (!categoryName || !categoryImage) {
+      if (!categoryName || !categoryImg) {
         return res.status(400).send({ message: "All fields are required." });
       }
 
       try {
         const result = await categoriesCollection.insertOne({
           categoryName,
-          categoryImage,
+          categoryImg,
         });
-        res.send({ message: "Category added successfully.", result });
+        res.send(result);
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Error adding category." });
@@ -526,11 +526,7 @@ async function run() {
           _id: new ObjectId(id),
         });
 
-        if (result.deletedCount > 0) {
-          res.send({ message: "Category deleted successfully." });
-        } else {
-          res.status(404).send({ message: "Category not found." });
-        }
+        res.send(result);
       } catch (error) {
         console.error(error);
         res.status(500).send({ message: "Error deleting category." });
