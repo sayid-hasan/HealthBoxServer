@@ -374,7 +374,7 @@ async function run() {
 
     // admin related apis
 
-    app.get("/admin/overview", verifytoken, async (req, res) => {
+    app.get("/admin/overview", verifytoken, verifyadmin, async (req, res) => {
       try {
         // Fetch all payments with the 'paid' status
         const paidPayments = await paymentsCollection
@@ -419,7 +419,7 @@ async function run() {
 
     // manage user role
     // make admin/moderator role verify admin middlware add korba etate
-    app.put("/users/admin/:id", verifytoken, async (req, res) => {
+    app.put("/users/admin/:id", verifytoken, verifyadmin, async (req, res) => {
       const id = req.params.id;
       const { userRole } = req?.body;
       const filter = { uid: id };
@@ -464,6 +464,77 @@ async function run() {
       console.log(query);
       const result = await usersCollection.find(query).toArray();
       res.send(result);
+    });
+
+    // manage categories for admin
+    // Fetch all categories
+    app.get("/categories", async (req, res) => {
+      try {
+        const categories = await categoriesCollection.find().toArray();
+        res.send(categories);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Error fetching categories." });
+      }
+    });
+
+    // Add a new category
+    app.post("/categories", async (req, res) => {
+      const { categoryName, categoryImage } = req.body;
+
+      if (!categoryName || !categoryImage) {
+        return res.status(400).send({ message: "All fields are required." });
+      }
+
+      try {
+        const result = await categoriesCollection.insertOne({
+          categoryName,
+          categoryImage,
+        });
+        res.send({ message: "Category added successfully.", result });
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Error adding category." });
+      }
+    });
+
+    // Update a category
+    app.put("/categories/:id", verifytoken, async (req, res) => {
+      const { id } = req.params;
+      console.log("update modal category", id);
+      const { categoryName, categoryImg } = req.body;
+
+      try {
+        const result = await categoriesCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { categoryName, categoryImg } }
+        );
+
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Error updating category." });
+      }
+    });
+
+    // Delete a category
+    app.delete("/categories/:id", async (req, res) => {
+      const { id } = req.params;
+
+      try {
+        const result = await categoriesCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        if (result.deletedCount > 0) {
+          res.send({ message: "Category deleted successfully." });
+        } else {
+          res.status(404).send({ message: "Category not found." });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Error deleting category." });
+      }
     });
 
     // check if user is admin
