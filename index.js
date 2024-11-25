@@ -648,14 +648,14 @@ async function run() {
       }
     });
 
-    // slelr medicine mamage
+    // seller home page
     app.get(
       "/sales-revenue/:email",
       verifytoken,
       verifySellerAdmin,
       async (req, res) => {
         const email = req.params?.email;
-        console.log("inside seller revenue", email);
+        // console.log("inside seller revenue", email);
         // Seller's email is passed as a query parameter.
 
         if (!email) {
@@ -710,9 +710,30 @@ async function run() {
         res.send(result);
       }
     );
-    // seller home page
+    // seller medicine
+    app.get(
+      "/seller-medicines/:email",
+      verifytoken,
+      verifySellerAdmin,
+      async (req, res) => {
+        const email = req.params?.email; // Seller's email is passed as a query parameter.
+        console.log("seller medicines", email);
+        if (!email) {
+          return res.status(400).send({ error: "Seller email is required." });
+        }
+        const result = await medicinesCollection
+          .find({
+            sellerEmail: email,
+          })
+          .toArray();
 
-    app.get("/seller-medicines", async (req, res) => {
+        res.send(result);
+      }
+    );
+
+    // payment history
+
+    app.get("/seller-medicines-sell", async (req, res) => {
       try {
         const { email } = req.query; // Seller's email is passed as a query parameter.
 
@@ -720,17 +741,18 @@ async function run() {
           return res.status(400).send({ error: "Seller email is required." });
         }
 
-        const result = await paymentsCollection;
-        aggregate([
-          {
-            $unwind: "$purchasedItems", // Unwind the purchasedItems array
-          },
-          {
-            $match: {
-              "purchasedItems.sellerEmail": email, // Match seller's email
+        const result = await paymentsCollection
+          .aggregate([
+            {
+              $unwind: "$purchasedItems", // Unwind the purchasedItems array
             },
-          },
-        ]).toArray();
+            {
+              $match: {
+                "purchasedItems.sellerEmail": email, // Match seller's email
+              },
+            },
+          ])
+          .toArray();
 
         res.send(result);
       } catch (error) {
