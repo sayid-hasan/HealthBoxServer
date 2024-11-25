@@ -561,6 +561,35 @@ async function run() {
       }
     });
 
+    // get manage payments
+    app.get("/admin/payments", verifytoken, verifyadmin, async (req, res) => {
+      // Fetch all payments
+      const payments = await paymentsCollection.find().toArray();
+      res.send(payments);
+    });
+    // update the payment status
+    app.put("/payments/:id", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        // Validate ObjectId
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid payment ID." });
+        }
+
+        const updateResult = await paymentsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status: "paid" } },
+          { upsert: true } // Ensures the document is inserted if not found
+        );
+
+        res.send(updateResult);
+      } catch (error) {
+        console.error("Error updating payment status:", error);
+        res.status(500).send({ error: "Failed to update payment status" });
+      }
+    });
+
     // check if user is admin
 
     // check admin
