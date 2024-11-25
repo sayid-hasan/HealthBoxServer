@@ -533,6 +533,34 @@ async function run() {
       }
     });
 
+    // sales report
+    app.get("/sales", verifytoken, verifyadmin, async (req, res) => {
+      const { startDate, endDate } = req?.query;
+      console.log(startDate, endDate);
+
+      try {
+        // Parse dates
+
+        let query = {};
+        if (startDate && endDate) {
+          query = {
+            date: {
+              $gte: new Date(startDate), // Start date
+              $lte: new Date(endDate), // End date
+            },
+          };
+        } else {
+          query = {};
+        }
+        const sales = await paymentsCollection.find(query).toArray();
+        console.log(sales);
+        res.send(sales);
+      } catch (error) {
+        console.error("Error fetching sales:", error);
+        res.status(500).send({ message: "Internal server error" });
+      }
+    });
+
     // check if user is admin
 
     // check admin
