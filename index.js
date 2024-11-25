@@ -674,17 +674,24 @@ async function run() {
             },
             {
               $group: {
+                _id: "$_id", // Group back to the original document level
+                status: { $first: "$status" }, // Keep the status of the original document
+                amount: { $first: "$amount" }, // Retain the original amount field
+              },
+            },
+            {
+              $group: {
                 _id: "$status", // Group by status (paid or pending)
-                totalCount: { $sum: 1 }, // Count the number of documents
-                amount: { $first: "$amount" }, // Include the amount field from the original document
+                totalCount: { $sum: 1 }, // Count the number of documents per status
+                amount: { $sum: "$amount" }, // Sum the amount field for each status
               },
             },
             {
               $project: {
-                _id: 0, // Exclude the _id field in the output
+                _id: 0, // Exclude the _id field
                 status: "$_id", // Include the grouped status field
-                amount: 1, // Retain the amount field
-                totalCount: 1, // Include the totalCount
+                totalCount: 1, // Include the total count of documents
+                amount: 1, // Include the summed total amount
               },
             },
           ])
