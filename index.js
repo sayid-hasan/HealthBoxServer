@@ -730,6 +730,56 @@ async function run() {
         res.send(result);
       }
     );
+    // post in seller medicine
+
+    app.post(
+      "/seller-medicines",
+      verifytoken,
+      verifySellerAdmin,
+      async (req, res) => {
+        const {
+          itemGenericName,
+          name,
+          image,
+          description,
+          sellerEmail,
+          category,
+          companyName,
+          discountPercentage,
+          price,
+          stock,
+        } = req.body;
+        if (
+          !itemGenericName ||
+          !name ||
+          !image ||
+          !description ||
+          !sellerEmail ||
+          !category ||
+          !companyName ||
+          !discountPercentage ||
+          !price ||
+          !stock
+        ) {
+          return res.status(400).send({ error: "All fields are required." });
+        }
+        const newMedicine = {
+          itemGenericName,
+          name,
+          image,
+          description,
+          sellerEmail,
+          category,
+          companyName,
+          discountPercentage,
+          price,
+          stock,
+        };
+
+        const result = await medicinesCollection.insertOne(newMedicine);
+        res.send(result);
+      }
+    );
 
     // payment history
 
