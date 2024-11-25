@@ -6,6 +6,7 @@ var jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { Console } = require("console");
 const app = express();
 // This is your test secret API key.
 const stripe = require("stripe")(process.env.STRIPE_SK);
@@ -25,13 +26,13 @@ const verifytoken = (req, res, next) => {
     return res.status(401).send({ message: "unauthorised access" });
   }
   const token = req.headers.authorization.split(" ")[1];
-  console.log("get token", token);
+  // console.log("get token", token);
   jwt.verify(token, process.env.ACCESS_SECRET_TOKEN, (err, decoded) => {
     if (err) {
       return res.status(401).send({ message: "unauthorised access" });
     }
     req.decoded = decoded;
-    console.log("from verifytoken decoded", decoded);
+    // console.log("from verifytoken decoded", decoded);
     next();
   });
 };
@@ -86,11 +87,11 @@ async function run() {
     // verify seller after checking verfytoken
     const verifySellerAdmin = async (req, res, next) => {
       const email = req.decoded.email;
-      console.log("verify moderator ", email);
+      // console.log("verify moderator ", email);
       const query = { email: email };
       const user = await usersCollection.findOne(query);
       const isSellerAdmin = user?.role === "seller" || user?.role === "admin";
-      console.log("inside verifyModeratorAdmin", isSellerAdmin);
+      // console.log("inside verifyModeratorAdmin", isSellerAdmin);
       if (!isSellerAdmin) {
         return res.status(403).send({ message: "forbidden access" });
       }
@@ -101,7 +102,7 @@ async function run() {
 
     app.post("/jwt", async (req, res) => {
       const userinfo = req?.body;
-      console.log("inside jwt", userinfo);
+      // console.log("inside jwt", userinfo);
       const token = await jwt.sign(userinfo, process.env.ACCESS_SECRET_TOKEN, {
         expiresIn: "4h",
       });
@@ -203,9 +204,18 @@ async function run() {
         image,
         stock,
         medicineId,
+        sellerEmail,
       } = req.body;
 
-      if (!name || !companyName || !price || !userUid || !image || !stock) {
+      if (
+        !name ||
+        !companyName ||
+        !price ||
+        !userUid ||
+        !image ||
+        !stock ||
+        !sellerEmail
+      ) {
         return res.status(400).send({ error: "All fields are required." });
       }
 
@@ -227,6 +237,7 @@ async function run() {
         userUid,
         image,
         stock,
+        sellerEmail,
       };
 
       const result = await cartsCollection.insertOne(newCartItem);
@@ -329,7 +340,7 @@ async function run() {
       // Step 2: Create a payment document with cart items
       const paymentDocument = {
         ...payment, // Include payment details (e.g., amount, transaction ID, date)
-
+        status: "pending",
         purchasedItems: cartItems, // Attach cart items to the payment record
       };
       // Step 3: Reduce stock for each purchased item
@@ -648,6 +659,90 @@ async function run() {
       }
     });
 
+    // slelr medicine mamage
+    app.get(
+      "/sales-revenue/:email",
+      verifytoken,
+      verifySellerAdmin,
+      async (req, res) => {
+        const email = req.params?.email;
+        console.log("inside seller revenue", email);
+        // Seller's email is passed as a query parameter.
+
+        if (!email) {
+          return res.status(400).send({ error: "Seller email is required." });
+        }
+
+        const result = await paymentsCollection
+          .aggregate([
+            {
+              $unwind: "$purchasedItems", // Unwind the purchasedItems array
+            },
+            {
+              $match: {
+                "purchasedItems.sellerEmail": "syedhasanmohammad@gmaila.com", // Match seller's email in the purchasedItems field
+              },
+            },
+            {
+              $group: {
+                _id: "$status", // Group by status (paid or pending)
+                totalCount: { $sum: 1 }, // Count the number of documents
+                amount: { $first: "$amount" }, // Include the amount field from the original document
+              },
+            },
+            {
+              $project: {
+                _id: 0, // Exclude the _id field in the output
+                status: "$_id", // Include the grouped status field
+                amount: 1, // Retain the amount field
+                totalCount: 1, // Include the totalCount
+              },
+            },
+          ])
+          .toArray();
+        // Initialize totals
+
+        // // Process the result to calculate paid and pending totals
+        // result.forEach((item) => {
+        //   if (item._id === "paid") {
+        //     paidTotal = item.totalAmount;
+        //   } else if (item._id === "pending") {
+        //     pendingTotal = item.totalAmount;
+        //   }
+        // });
+
+        res.send(result);
+      }
+    );
+    // seller home page
+
+    app.get("/seller-medicines", async (req, res) => {
+      try {
+        const { email } = req.query; // Seller's email is passed as a query parameter.
+
+        if (!email) {
+          return res.status(400).send({ error: "Seller email is required." });
+        }
+
+        const result = await paymentsCollection;
+        aggregate([
+          {
+            $unwind: "$purchasedItems", // Unwind the purchasedItems array
+          },
+          {
+            $match: {
+              "purchasedItems.sellerEmail": email, // Match seller's email
+            },
+          },
+        ]).toArray();
+
+        res.send(result);
+      } catch (error) {
+        console.error("Error fetching seller medicines:", error);
+        res.status(500).send({ error: "Failed to fetch seller medicines." });
+      }
+    });
+
     // check if user is admin
 
     // check admin
@@ -657,8 +752,8 @@ async function run() {
 
       async (req, res) => {
         const email = req.params.email;
-        console.log("inside useAdmin route", req.decoded.email);
-        console.log("inside useAdmin params", email);
+        // console.log("inside useAdmin route", req.decoded.email);
+        // console.log("inside useAdmin params", email);
 
         if (email !== req.decoded.email) {
           return res.status(401).send({
@@ -686,8 +781,8 @@ async function run() {
 
       async (req, res) => {
         const email = req.params.email;
-        console.log("inside seller route", req.decoded.email);
-        console.log("inside seller params", email);
+        // console.log("inside seller route", req.decoded.email);
+        // console.log("inside seller params", email);
 
         if (email !== req.decoded.email) {
           return res.status(401).send({
@@ -697,9 +792,9 @@ async function run() {
         const query = {
           email: email,
         };
-        console.log(query);
+        // console.log(query);
         const user = await usersCollection.findOne(query);
-        console.log("inside check moderator route", user);
+        // console.log("inside check moderator route", user);
         let seller = false;
         if (user) {
           seller = user?.role === "seller";
