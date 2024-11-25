@@ -65,6 +65,9 @@ async function run() {
     const usersCollection = client.db("HealthBox").collection("users");
     const cartsCollection = client.db("HealthBox").collection("carts");
     const paymentsCollection = client.db("HealthBox").collection("payments");
+    const advertisementsCollection = client
+      .db("HealthBox")
+      .collection("advertisements");
 
     //  middleware
     // verify admin after checking verfytoken
@@ -587,6 +590,61 @@ async function run() {
       } catch (error) {
         console.error("Error updating payment status:", error);
         res.status(500).send({ error: "Failed to update payment status" });
+      }
+    });
+
+    // advertisements for slider banner add or remove
+    app.put("/advertisements/:id/toggleSlide", async (req, res) => {
+      try {
+        const { id } = req.params;
+
+        // Validate ObjectId
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ message: "Invalid advertisement ID." });
+        }
+
+        const advertisement = await advertisementsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!advertisement) {
+          return res.status(404).send({ message: "Advertisement not found." });
+        }
+
+        const updatedStatus = !advertisement.isOnSlide; // Toggle the `isOnSlide` status
+
+        const updateResult = await advertisementsCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { isOnSlide: updatedStatus } }
+        );
+
+        res.send(updateResult);
+      } catch (error) {
+        console.error("Error toggling slide status:", error);
+        res.status(500).send({ error: "Server error occurred." });
+      }
+    });
+    app.get("/advertisements", verifytoken, verifyadmin, async (req, res) => {
+      try {
+        const advertisements = await advertisementsCollection.find().toArray();
+        res.send(advertisements);
+      } catch (error) {
+        console.error("Error fetching advertisements:", error);
+        res.status(500).send({ error: "Failed to fetch advertisements" });
+      }
+    });
+    // for home page banner in client side no nedd to use axiosSecure
+    app.get("/sliderAdvertisements", async (req, res) => {
+      try {
+        const sliderAds = await advertisementsCollection
+          .find({ isOnSlide: true })
+          .toArray();
+        res.send(sliderAds);
+      } catch (error) {
+        console.error("Error fetching slider advertisements:", error);
+        res
+          .status(500)
+          .send({ error: "Failed to fetch slider advertisements" });
       }
     });
 
