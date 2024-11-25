@@ -390,39 +390,28 @@ async function run() {
 
     app.get("/admin/overview", verifytoken, verifyadmin, async (req, res) => {
       try {
-        // Fetch all payments with the 'paid' status
-        const paidPayments = await paymentsCollection
-          .find({ status: "paid" })
-          .toArray();
-
-        // Calculate total revenue (sum of all paid payments)
-        const totalRevenue = paidPayments.reduce(
-          (sum, payment) => sum + payment.amount,
-          0
-        );
-
         // Fetch all payments with 'pending' status
-        const pendingPayments = await paymentsCollection
-          .find({ status: "pending" })
+        const result = await paymentsCollection
+          .aggregate([
+            {
+              $group: {
+                _id: "$status", // Group by status (paid or pending)
+                totalCount: { $sum: 1 }, // Count the number of documents
+                totalAmount: { $sum: "$amount" }, // Sum the amount field for each status
+              },
+            },
+            {
+              $project: {
+                _id: 0, // Exclude the _id field in the output
+                status: "$_id", // Include the grouped status field
+                totalAmount: 1, // Retain the totalAmount field
+                totalCount: 1, // Include the totalCount
+              },
+            },
+          ])
           .toArray();
 
-        // Calculate total pending amount
-        const pendingTotal = pendingPayments.reduce(
-          (sum, payment) => sum + payment.amount,
-          0
-        );
-        console.log(
-          "admin profile",
-          totalRevenue,
-          pendingTotal,
-          paidPayments.length
-        );
-
-        res.send({
-          totalRevenue,
-          pendingTotal,
-          paidTotal: paidPayments.length, // Total number of paid transactions
-        });
+        res.send(result);
       } catch (error) {
         console.error(error);
         res
