@@ -20,22 +20,6 @@ app.use(express.json());
 
 // custom middleware
 // custom midlw=eware verify token
-const verifytoken = (req, res, next) => {
-  console.log("inside verifytoken middleware", req.headers.authorization);
-  if (!req.headers.authorization) {
-    return res.status(401).send({ message: "unauthorised access" });
-  }
-  const token = req.headers.authorization.split(" ")[1];
-  // console.log("get token", token);
-  jwt.verify(token, process.env.ACCESS_SECRET_TOKEN, (err, decoded) => {
-    if (err) {
-      return res.status(401).send({ message: "unauthorised access" });
-    }
-    req.decoded = decoded;
-    // console.log("from verifytoken decoded", decoded);
-    next();
-  });
-};
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.grteoyu.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -71,9 +55,25 @@ async function run() {
       .collection("advertisements");
 
     //  middleware
+    const verifytoken = (req, res, next) => {
+      console.log("inside verifytoken middleware", req?.headers?.authorization);
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: "unauthorised access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      // console.log("get token", token);
+      jwt.verify(token, process.env.ACCESS_SECRET_TOKEN, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "unauthorised access" });
+        }
+        req.decoded = decoded;
+        // console.log("from verifytoken decoded", decoded);
+        next();
+      });
+    };
     // verify admin after checking verfytoken
     const verifyadmin = async (req, res, next) => {
-      const email = req.decoded.email;
+      const email = req?.decoded?.email;
       console.log("verify admin ", email);
       const query = { email: email };
       const user = await usersCollection.findOne(query);
@@ -857,7 +857,21 @@ async function run() {
       res.send(result);
     });
 
-    // GET request to fetch all medicines by sellerEmail
+    //  user payment history
+    // API Route
+    app.get("/purchases/:userId", verifytoken, async (req, res) => {
+      const { userId } = req.params;
+
+      // Query the database to find purchases for the user
+      const purchases = await paymentsCollection
+        .find({ userId })
+        .sort({ date: -1 }) // Sort by date, descending
+        .limit(0) // No limit, can adjust as needed
+        .toArray(); //
+
+      // Respond with the retrieved data
+      res.send(purchases);
+    });
 
     // check if user is admin
 
@@ -867,17 +881,17 @@ async function run() {
       verifytoken,
 
       async (req, res) => {
-        const email = req.params.email;
+        const sellerEmail = req?.params?.email;
         // console.log("inside useAdmin route", req.decoded.email);
         // console.log("inside useAdmin params", email);
 
-        if (email !== req.decoded.email) {
+        if (sellerEmail !== req?.decoded?.email) {
           return res.status(401).send({
             message: "Unauthorize access",
           });
         }
         const query = {
-          email: email,
+          email: sellerEmail,
         };
         console.log(query);
         const user = await usersCollection.findOne(query);
@@ -896,9 +910,9 @@ async function run() {
       verifytoken,
 
       async (req, res) => {
-        const email = req.params.email;
+        const email = req?.params?.email;
         // console.log("inside seller route", req.decoded.email);
-        // console.log("inside seller params", email);
+        console.log("inside seller params", email);
 
         if (email !== req.decoded.email) {
           return res.status(401).send({
