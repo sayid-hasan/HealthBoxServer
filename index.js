@@ -717,7 +717,7 @@ async function run() {
       verifySellerAdmin,
       async (req, res) => {
         const email = req.params?.email; // Seller's email is passed as a query parameter.
-        console.log("seller medicines", email);
+        // console.log("seller medicines", email);
         if (!email) {
           return res.status(400).send({ error: "Seller email is required." });
         }
@@ -783,33 +783,81 @@ async function run() {
 
     // payment history
 
-    app.get("/seller-medicines-sell", async (req, res) => {
-      try {
-        const { email } = req.query; // Seller's email is passed as a query parameter.
+    app.get(
+      "/seller-medicines-sell/:email",
+      verifytoken,
+      verifySellerAdmin,
+      async (req, res) => {
+        try {
+          const email = req.params?.email; // Seller's email is passed as a query parameter.
+          console.log("seller payment history", email);
+          if (!email) {
+            return res.status(400).send({ error: "Seller email is required." });
+          }
 
-        if (!email) {
-          return res.status(400).send({ error: "Seller email is required." });
-        }
-
-        const result = await paymentsCollection
-          .aggregate([
-            {
-              $unwind: "$purchasedItems", // Unwind the purchasedItems array
-            },
-            {
-              $match: {
-                "purchasedItems.sellerEmail": email, // Match seller's email
+          const result = await paymentsCollection
+            .aggregate([
+              {
+                $unwind: "$purchasedItems", // Unwind the purchasedItems array
               },
-            },
-          ])
-          .toArray();
+              {
+                $match: {
+                  "purchasedItems.sellerEmail": "syedhasanmohammad@gmaila.com",
+                }, // Filter by seller's email
+              },
+              {
+                $group: {
+                  _id: "$_id", // Group by original payment document ID
+                  userId: { $first: "$userId" }, // Retain userId
+                  status: { $first: "$status" }, // Retain status
+                  amount: { $first: "$amount" }, // Retain the amount
+                },
+              },
+              {
+                $project: {
+                  _id: 0, // Exclude the _id field
+                  userId: 1, // Include userId
+                  status: 1, // Include status
+                  amount: 1, // Include amount
+                },
+              },
+            ])
+            .toArray();
 
-        res.send(result);
-      } catch (error) {
-        console.error("Error fetching seller medicines:", error);
-        res.status(500).send({ error: "Failed to fetch seller medicines." });
+          res.send(result);
+        } catch (error) {
+          console.error("Error fetching seller medicines:", error);
+          res.status(500).send({ error: "Failed to fetch seller medicines." });
+        }
       }
+    );
+
+    // ask for advertisement
+
+    // POST request to insert advertisement data
+    app.post("/ask-advertisements", async (req, res) => {
+      const { image, name, description, sellerEmail } = req.body; // Extract data from the request body
+      const advertisement = {
+        image,
+        name,
+        description,
+        sellerEmail,
+        isOnSlide: false, // Set the slider status
+      };
+      const result = await advertisementsCollection.insertOne(advertisement);
+      res.send(result);
     });
+    // Get advertisement medicine  data add by seller
+    app.get("/sellerAdsMedicines/:email", async (req, res) => {
+      const email = req.params?.email;
+
+      const result = await advertisementsCollection
+        .find({ sellerEmail: email })
+        .toArray();
+      res.send(result);
+    });
+
+    // GET request to fetch all medicines by sellerEmail
 
     // check if user is admin
 
